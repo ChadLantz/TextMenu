@@ -1,0 +1,35 @@
+#######################################
+# Syntax Coloring Map For TextMenu
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+TextMenu KEYWORD1
+BUTTON KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+addEntry	KEYWORD2
+addSubMenu	KEYWORD2
+addButton	KEYWORD2
+setButton	KEYWORD2
+setParent	KEYWORD2
+setCurrentMenu	KEYWORD2
+setLineHeight	KEYWORD2
+getButton	KEYWORD2
+getParent	KEYWORD2
+getCurrentMenu	KEYWORD2
+draw	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+BTN_UP	LITERAL1
+BTN_DOWN	LITERAL1
+BTN_ENTER	LITERAL1
+BTN_BACK	LITERAL1
