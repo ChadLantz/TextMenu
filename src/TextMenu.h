@@ -1,8 +1,8 @@
 #ifndef TextMenu_h
 #define TextMenu_h
 
-#if !defined(ESP32) && !defined(ESP8266)
-  #error “This library only supports ESP32 and ESP8266 boards”
+#if !defined(ARDUINO_ARCH_ESP32) && !defined(ARDUINO_ARCH_ESP8266)
+  #error This library only supports ESP32 and ESP8266 boards
 #endif
 
 #include <Arduino.h>
@@ -28,12 +28,12 @@ class TextMenu{
 
     void addEntry(String _name, TextMenu &_subMenu);
     void addEntry(String _name, func_ptr_t func );
-    TextMenu* addSubMenu(String _name);
-    ezButton* addButton(BUTTON whichOne, uint8_t _pin);
+    TextMenu& addSubMenu(String _name);
+    ezButton& addButton(BUTTON whichOne, uint8_t _pin);
 
     void setButton(BUTTON whichOne, ezButton &button);
-    void setParent(TextMenu *_parent);
-    void setCurrentMenu(TextMenu *_menu);
+    void setParent(TextMenu &_parent);
+    void setCurrentMenu(TextMenu &_menu);
 
     /**
      * @brief Set the line height in number of pixels. Does not change the font, just the distance from line to line
@@ -41,11 +41,14 @@ class TextMenu{
      */
     void setLineHeight(uint8_t _height){m_lineHeight = _height;}
 
-    ezButton* getButton(BUTTON whichOne){return m_ezButtonArray[whichOne];};
-    TextMenu* getParent(){return m_parent;}
-    TextMenu* getCurrentMenu(){return m_currentMenu;}
+    void setHeaderHeight(uint8_t _height){m_headerHeight = _height;}
 
-    //This is the main function that gets called during loop()
+    ezButton& getButton(BUTTON whichOne){return *m_ezButtonArray[whichOne];};
+    TextMenu& getParent(){return *m_parent;}
+    TextMenu& getCurrentMenu(){return *m_currentMenu;}
+    uint8_t getHeaderHeight(){return m_headerHeight;}
+
+    void drawCurrentMenu(OLEDDisplay &display);
     void draw(OLEDDisplay &display);
 
   private:
@@ -63,6 +66,7 @@ class TextMenu{
     uint8_t m_cursorPos;
     uint8_t m_nEntries;
     uint8_t m_lineHeight;
+    uint8_t m_headerHeight;
     uint8_t m_startLine;
 };
 

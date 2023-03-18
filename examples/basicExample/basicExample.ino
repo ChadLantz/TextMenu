@@ -1,5 +1,11 @@
-#include "WiFi.h"
 #include <Wire.h>
+
+#if defined(ARDUINO_ARCH_ESP32)
+#include "WiFi.h"
+#elif defined(ARDUINO_ARCH_ESP8266)
+#include <ESP8266WiFi.h>
+#endif
+
 #include "SSD1306Wire.h"
 #include "TextMenu.h"
 #include "image.h"
@@ -15,10 +21,10 @@ SSD1306Wire display(0x3c, SDA, SCL);
 
 //Make our buttons and menu
 //Be sure to set the pin numbers to the GPIO your buttons are connected to
-ezButton Up(9);
-ezButton Down(8);
-ezButton Enter(7);
-ezButton Back(6);
+ezButton Up(D5);
+ezButton Down(D6);
+ezButton Enter(D7);
+ezButton Back(D8);
 TextMenu menu("Main", Up, Down, Enter, Back);
 
 
@@ -43,7 +49,7 @@ bool doSomething(){
 
 
 //Define some parameters for the next function
-int scanInterval = 10000; 
+uint32_t scanInterval = 10000; 
 int lastScan = 0;
 int startIndex = 0;
 int nLines = screenH/lineHeight;
@@ -93,38 +99,29 @@ bool wifiScan(){
 }
 
 void setup() {
-  Serial.begin(115200);
-  Serial.println();
-  
   display.init();
   display.flipScreenVertically();
-  display.setFont(ArialMT_Plain_10);
-  display.setTextAlignment(TEXT_ALIGN_LEFT);
-  display.drawString(0, screenH/2,"In setup");
-  display.display();
-
-  Serial.println("In setup");
 
   menu.setLineHeight(11);
-  TextMenu *subMenu = menu.addSubMenu("Option 1");
-  TextMenu *subSubMenu = subMenu->addSubMenu("Sub Option 1");
+  menu.setHeaderHeight(16);//This is useful for the two color displays
+  TextMenu& subMenu = menu.addSubMenu("Option 1");
+  TextMenu& subSubMenu = subMenu.addSubMenu("Sub Option 1");
 
   //Add some filler to demonstrate scrolling
-  subMenu->addEntry("Does nothing 1", nullptr);
-  subMenu->addEntry("Does nothing 2", nullptr);
-  subMenu->addEntry("Does nothing 3", nullptr);
-  subMenu->addEntry("Does nothing 4", nullptr);
-  subMenu->addEntry("Does nothing 5", nullptr);
-  subMenu->addEntry("Does nothing 6", nullptr);
+  subMenu.addEntry("Does nothing 1", nullptr);
+  subMenu.addEntry("Does nothing 2", nullptr);
+  subMenu.addEntry("Does nothing 3", nullptr);
+  subMenu.addEntry("Does nothing 4", nullptr);
+  subMenu.addEntry("Does nothing 5", nullptr);
+  subMenu.addEntry("Does nothing 6", nullptr);
   
-  subSubMenu->addEntry("Do Something", &doSomething);
+  subSubMenu.addEntry("Do Something", &doSomething);
   menu.addEntry("WiFi Scan", &wifiScan);
 }
 
 void loop() {
-  menu.getCurrentMenu()->draw(display);
+  menu.drawCurrentMenu(display);
 
-  Serial.println("in Loop, doing things");
     //If we still have time left, delay for the remainder
   int remainingTimeBudget = lastFrameTime - millis();
   if (remainingTimeBudget > 0) {

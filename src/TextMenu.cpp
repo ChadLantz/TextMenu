@@ -10,6 +10,7 @@ TextMenu::TextMenu()
     m_currentEndPoint(nullptr),
     m_name(""),
     m_lineHeight(11),
+    m_headerHeight(0),
     m_startLine(0)
 {
     for(uint8_t i = 0; i < MAX_MENU_ENTRIES; i++){
@@ -31,18 +32,19 @@ TextMenu::TextMenu()
  */
 TextMenu::TextMenu(String _name, TextMenu &_parent)
   : m_parent(&_parent),
-    m_currentMenu(_parent.getCurrentMenu()),
+    m_currentMenu(&_parent.getCurrentMenu()),
     m_currentEndPoint(nullptr),
     m_name(_name),
     m_cursorPos(0),
     m_nEntries(0),
     m_lineHeight(11),
+    m_headerHeight(_parent.getHeaderHeight()),
     m_startLine(0)
 {
-    m_ezButtonArray[0] = m_parent->getButton(BTN_UP);
-    m_ezButtonArray[1] = m_parent->getButton(BTN_DOWN);
-    m_ezButtonArray[2] = m_parent->getButton(BTN_ENTER);
-    m_ezButtonArray[3] = m_parent->getButton(BTN_BACK);
+    m_ezButtonArray[0] = &m_parent->getButton(BTN_UP);
+    m_ezButtonArray[1] = &m_parent->getButton(BTN_DOWN);
+    m_ezButtonArray[2] = &m_parent->getButton(BTN_ENTER);
+    m_ezButtonArray[3] = &m_parent->getButton(BTN_BACK);
     for(uint8_t i = 0; i < BTN_COUNT; i++){
         m_ownedButtons[i] = false;
     }
@@ -69,6 +71,7 @@ TextMenu::TextMenu(String _name, ezButton &_Up, ezButton &_Down, ezButton &_Ente
     m_cursorPos(0),
     m_nEntries(0),
     m_lineHeight(11),
+    m_headerHeight(0),
     m_startLine(0)
 {
     m_ezButtonArray[0] = &_Up;
@@ -128,23 +131,26 @@ void TextMenu::addEntry(String _name, func_ptr_t func ){
 /**
  * @brief Add a sub menu to this menu
  * @param _name Name of this new sub menu
- * @return Pointer to the newly created sub menu
+ * @return Reference to the newly created sub menu
  */
-TextMenu* TextMenu::addSubMenu(String _name){
+TextMenu& TextMenu::addSubMenu(String _name){
+    //Make it new so it doesn't go out of scope, but dereference it right away
+    //Because references are more user friendly
     TextMenu *newEntry = new TextMenu(_name, *this);
     addEntry(_name, *newEntry);
-    return newEntry;
+    return *newEntry;
 }
 
 /**
  * @brief Add a button with the pin. This TextMenu instance will claim ownership of this button.
  * @param whichOne Button to be created. Options are BTN_UP, BTN_DOWN, BTN_ENTER, and BTN_BACK
  * @param _pin Which GPIO pin this button is on
- * @return A pointer to the new button
+ * @return A reference to the new button
  */
-ezButton* TextMenu::addButton(BUTTON whichOne, uint8_t _pin){
-    //Prevent a seg fault here
-    if(whichOne >= BTN_COUNT) return nullptr;
+ezButton& TextMenu::addButton(BUTTON whichOne, uint8_t _pin){
+    //The user requested to assign a button whos function doesn't exist.
+    //Make the button, but don't assign it to anything
+    if(whichOne >= BTN_COUNT) return *(new ezButton(_pin));
 
     //If a button already exists in this slot and this TextMenu owns it, delete it
     if(m_ezButtonArray[whichOne] && m_ownedButtons[whichOne]) delete m_ezButtonArray[whichOne];
@@ -152,9 +158,11 @@ ezButton* TextMenu::addButton(BUTTON whichOne, uint8_t _pin){
     //This object owns the new button
     m_ownedButtons[whichOne] = true;
 
+    //Make it new so it doesn't go out of scope, but dereference it right away
+    //Because references are more user friendly
     ezButton *button = new ezButton(_pin);
     setButton(whichOne, *button);
-    return button;
+    return *button;
 }
 
 /**
@@ -172,9 +180,9 @@ void TextMenu::setButton(BUTTON whichOne, ezButton &button){
  * @brief Set the parent of this TextMenu and inform the parent that this child is moving in
  * @param _parent Adoptive parent
  */
-void TextMenu::setParent(TextMenu *_parent){
-    m_parent = _parent;
-    _parent->addEntry(m_name,*this);
+void TextMenu::setParent(TextMenu &_parent){
+    m_parent = &_parent;
+    m_parent->addEntry(m_name,*this);
 }
 
 /* This may require some abstract thought
@@ -192,11 +200,21 @@ void TextMenu::setParent(TextMenu *_parent){
  * have to search down the tree recursively every time loop() is called
  * @param _menu The menu to be drawn
  */
-void TextMenu::setCurrentMenu(TextMenu *_menu){
-    m_currentMenu = _menu;
+void TextMenu::setCurrentMenu(TextMenu &_menu){
+    m_currentMenu = &_menu;
     if(m_parent){
         m_parent->setCurrentMenu(_menu);
     }
+}
+
+
+/**
+ * @brief This is the method that will be called in loop() for the main menu.
+ * This simplifies the process for the user
+ * @param display The display to be drawn on
+ */
+void TextMenu::drawCurrentMenu(OLEDDisplay &display){
+    m_currentMenu->draw(display);
 }
 
 
@@ -207,7 +225,11 @@ void TextMenu::setCurrentMenu(TextMenu *_menu){
  */
 void TextMenu::draw(OLEDDisplay &display){
     
-    uint8_t nLines = (display.getHeight()/m_lineHeight) - 1;
+    //If the header height hasn't been set, just use the line height
+    uint8_t headerHeight = (m_headerHeight > 0) ? m_headerHeight : m_lineHeight;    
+    
+    //Get the number of lines available for the menu entries
+    uint8_t nLines = (display.getHeight() - headerHeight)/m_lineHeight;
 
     //Handle button presses to see if we should draw this menu or something else
     int8_t doDraw = handleButtons(nLines);
@@ -227,7 +249,7 @@ void TextMenu::draw(OLEDDisplay &display){
     //Draw each menu option that will fit on the screen
     display.setTextAlignment(TEXT_ALIGN_LEFT);
     for(uint8_t i = m_startLine; i < min((uint8_t)(m_startLine+nLines),m_nEntries); i++ ){
-        uint8_t y = (i+1-m_startLine)*m_lineHeight;
+        uint8_t y = headerHeight + (i-m_startLine)*m_lineHeight;
         display.drawString(10, y, m_entryNames[i]);
         if(i==m_cursorPos){
             display.drawHorizontalLine(2,y+m_lineHeight/2,6);
@@ -268,7 +290,7 @@ int8_t TextMenu::handleButtons(uint8_t _nLines){
         //If there is no parent, we can't go back so keep drawing this menu
         if(m_parent){ 
             m_startLine = m_cursorPos = 0;
-            setCurrentMenu(m_parent);
+            setCurrentMenu(*m_parent);
             return -1;
         }else{
             return 0;
@@ -294,7 +316,7 @@ int8_t TextMenu::handleButtons(uint8_t _nLines){
         }else if(m_TextMenuArray[m_cursorPos]){
             //if we are on a submenu entry, set it as the current menu and
             //draw that one instead
-            setCurrentMenu(m_TextMenuArray[m_cursorPos]);
+            setCurrentMenu(*m_TextMenuArray[m_cursorPos]);
             return -1;
         }
     }
