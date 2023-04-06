@@ -7,6 +7,7 @@
 TextMenu::TextMenu()
   : m_parent(nullptr),
     m_currentMenu(this),
+    m_overlay(nullptr),
     m_currentEndPoint(nullptr),
     m_name(""),
     m_lineHeight(11),
@@ -33,6 +34,7 @@ TextMenu::TextMenu()
 TextMenu::TextMenu(String _name, TextMenu &_parent)
   : m_parent(&_parent),
     m_currentMenu(&_parent.getCurrentMenu()),
+    m_overlay(nullptr),
     m_currentEndPoint(nullptr),
     m_name(_name),
     m_cursorPos(0),
@@ -66,6 +68,7 @@ TextMenu::TextMenu(String _name, TextMenu &_parent)
 TextMenu::TextMenu(String _name, ezButton &_Up, ezButton &_Down, ezButton &_Enter, ezButton &_Back)
   : m_parent(nullptr),
     m_currentMenu(this),
+    m_overlay(nullptr),
     m_currentEndPoint(nullptr),
     m_name(_name),
     m_cursorPos(0),
@@ -208,6 +211,21 @@ void TextMenu::setCurrentMenu(TextMenu &_menu){
 }
 
 
+
+/**
+ * @brief Sets the overlay for this menu and all its children
+ * @param func 
+ */
+void TextMenu::setOverlay(func_ptr_t func){
+    m_overlay = func;
+    for(int i = 0; i < MAX_MENU_ENTRIES; i++){
+        if(m_TextMenuArray[i]){
+            m_TextMenuArray[i]->setOverlay(func);
+        }
+    }
+}
+
+
 /**
  * @brief This is the method that will be called in loop() for the main menu.
  * This simplifies the process for the user
@@ -232,16 +250,21 @@ void TextMenu::draw(OLEDDisplay &display){
     uint8_t nLines = (display.getHeight() - headerHeight)/m_lineHeight;
 
     //Handle button presses to see if we should draw this menu or something else
+    display.clear();
     int8_t doDraw = handleButtons(nLines);
+
     if( doDraw == -1){ 
+        if(m_overlay) m_overlay();
         m_currentMenu->draw(display);
+        display.display();
         return;
     }else if(doDraw == 1){
+        display.display();
         return;
     }
 
+    if(m_overlay) m_overlay();
     //Draw the name of the current menu top and center
-    display.clear();
     display.setFont(ArialMT_Plain_10);
     display.setTextAlignment(TEXT_ALIGN_CENTER);
     display.drawString(display.getWidth()/2, 0, m_name);
@@ -261,9 +284,9 @@ void TextMenu::draw(OLEDDisplay &display){
 /**
  * @brief Handles button presses and sets internal values accordingly
  * @param nLines Number of lines that can be drawn
- * @return -1 if the current menu has changed and should be drawn
+ * @return -1 if the current menu has changed and the new one should be drawn
  *          0 if this menu should be drawn 
- *          1 if false if the menu should not be drawn
+ *          1 if the endpoint was drawn
  */
 int8_t TextMenu::handleButtons(uint8_t _nLines){
     //Update our buttons right away
@@ -309,10 +332,17 @@ int8_t TextMenu::handleButtons(uint8_t _nLines){
 
     }else if(m_ezButtonArray[BTN_ENTER]->isPressed()){
         if(m_funcArray[m_cursorPos]){
-        //if a function exists, set it as the current endpoint and call it
+            //if a function exists, set it as the current endpoint and call it
             m_currentEndPoint = m_funcArray[m_cursorPos];
-            m_currentEndPoint();
-            return 1;
+
+            //If that function returns false (only wants to be called once)
+            //nullify the current endpoint and proceed to draw this menu again
+            if(!m_currentEndPoint()){
+                m_currentEndPoint = nullptr;
+                return 0;
+            }else{
+                return 1;
+            }
         }else if(m_TextMenuArray[m_cursorPos]){
             //if we are on a submenu entry, set it as the current menu and
             //draw that one instead

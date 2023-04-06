@@ -34,6 +34,7 @@ class TextMenu{
     void setButton(BUTTON whichOne, ezButton &button);
     void setParent(TextMenu &_parent);
     void setCurrentMenu(TextMenu &_menu);
+    void setOverlay(func_ptr_t func);
 
     /**
      * @brief Set the line height in number of pixels. Does not change the font, just the distance from line to line
@@ -58,6 +59,7 @@ class TextMenu{
     bool m_ownedButtons[BTN_COUNT];
     TextMenu *m_currentMenu;
 
+    func_ptr_t m_overlay;
     func_ptr_t m_currentEndPoint;
     String m_name;
     String m_entryNames[MAX_MENU_ENTRIES];
